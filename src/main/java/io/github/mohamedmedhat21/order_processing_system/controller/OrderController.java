@@ -32,7 +32,7 @@ public class OrderController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	@Operation(summary = "Create order (happy path — no inventory locking yet)")
+	@Operation(summary = "Create order and run processing pipeline (notification sent asynchronously)")
 	public OrderResponse createOrder(@Valid @RequestBody CreateOrderRequest request) {
 		return orderService.createOrder(request);
 	}

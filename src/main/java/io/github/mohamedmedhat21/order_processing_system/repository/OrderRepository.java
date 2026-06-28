@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.Optional;
 
 import io.github.mohamedmedhat21.order_processing_system.domain.Order;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +31,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 			WHERE o.id = :id
 			""")
 	Optional<Order> findByIdWithItems(@Param("id") Long id);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			SELECT DISTINCT o FROM Order o
+			LEFT JOIN FETCH o.items items
+			LEFT JOIN FETCH items.product
+			LEFT JOIN FETCH o.user
+			WHERE o.id = :id
+			""")
+	Optional<Order> findByIdWithItemsForUpdate(@Param("id") Long id);
 }
