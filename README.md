@@ -42,8 +42,16 @@ Product **Webcam HD** (id `5`) is seeded with **1 unit** — used by the invento
 Run Postgres, Redis, and RabbitMQ via Compose, then start the app with Maven:
 
 ```bash
+cp .env.example .env   # if you have not already
 docker compose up -d postgres redis rabbitmq --wait
 ./mvnw spring-boot:run
+```
+
+`spring-boot:run` does **not** read `.env` automatically (Compose does). Defaults in `application.yaml` match the Compose broker (`ops` / `ops` on `localhost:5672`). If you changed `RABBITMQ_USER` / `RABBITMQ_PASSWORD` in `.env`, export the same values before starting the app:
+
+```bash
+export SPRING_RABBITMQ_USERNAME=ops
+export SPRING_RABBITMQ_PASSWORD=ops
 ```
 
 Or point `SPRING_DATASOURCE_*`, `SPRING_DATA_REDIS_*`, and `SPRING_RABBITMQ_*` at your own instances (see `application.yaml`).
