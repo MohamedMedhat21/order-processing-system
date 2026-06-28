@@ -13,11 +13,12 @@ Take-home assignment for a Senior Backend Engineer interview. Time budget: ~4 bu
 - **Maven**
 - PostgreSQL 18, Flyway for migrations
 - **Redis** for read-through caching of the product catalog only (see design decision #5 below — never used as the source of truth for inventory)
+- **RabbitMQ** for async order notifications only (`FULFILLED → NOTIFIED`); inventory and payment stay in Postgres transactions
 - Spring Security + JWT (`io.jsonwebtoken` / jjwt — added manually, not a Spring Initializr starter)
 - springdoc-openapi for Swagger UI
 - Bucket4j for rate limiting
-- JUnit 5 + Mockito + Testcontainers (PostgreSQL module) for tests
-- Docker Compose — **mandatory**, must bring up app + Postgres + Redis together via a single `docker compose up`
+- JUnit 5 + Mockito + Testcontainers (PostgreSQL, RabbitMQ modules) for tests
+- Docker Compose — **mandatory**, must bring up app + Postgres + Redis + RabbitMQ together via a single `docker compose up`
 
 ### Spring Boot 4.x gotchas to watch for
 - `@MockBean` / `@SpyBean` are removed in 4.0 — use `@MockitoBean` / `@MockitoSpyBean` instead.
@@ -29,18 +30,18 @@ Take-home assignment for a Senior Backend Engineer interview. Time budget: ~4 bu
 ```bash
 ./mvnw clean install                      # build + run unit tests
 ./mvnw spring-boot:run                    # run the app locally
-docker compose up -d                      # mandatory: starts app + Postgres + Redis together
+docker compose up -d                      # mandatory: starts app + Postgres + Redis + RabbitMQ together
 ./mvnw test -Dtest=*ConcurrencyTest        # run only the concurrency suite
 ./mvnw flyway:migrate                     # apply migrations manually if needed
 ```
 
-`docker compose up` must bring up the full stack with healthchecks — the app's `depends_on` should wait for Postgres and Redis to report healthy before starting, not just for the containers to exist.
+`docker compose up` must bring up the full stack with healthchecks — the app's `depends_on` should wait for Postgres, Redis, and RabbitMQ to report healthy before starting, not just for the containers to exist.
 
 ## Package structure
 
 ```
 io.github.mohamedmedhat21.order-processing-system
-├── config/         Security, async executor (virtual threads), OpenAPI, rate limiting, Redis cache config
+├── config/         Security, async executor (virtual threads), RabbitMQ, OpenAPI, rate limiting, Redis cache config
 ├── controller/      REST controllers — thin, no business logic
 ├── service/         Business logic; transaction boundaries live here
 ├── repository/      Spring Data JPA repositories
@@ -56,14 +57,14 @@ io.github.mohamedmedhat21.order-processing-system
 Don't relitigate these without explicitly flagging the tradeoff first — they were chosen deliberately for the interview narrative, not just for convenience.
 
 1. **Inventory locking** — pessimistic row lock (`SELECT ... FOR UPDATE`) inside the reservation transaction. Not optimistic versioning (`@Version`). The story being told is "no customer ever sees a false success," and pessimistic locking is the more defensible choice for last-unit contention.
-2. **Async work** — Java 21 virtual threads (`Executors.newVirtualThreadPerTaskExecutor()`) as the `@Async` executor bean, not a classic fixed `ThreadPoolExecutor`.
+2. **Async notifications** — RabbitMQ publishes after `FULFILLED`; a consumer drives `NOTIFIED`. Virtual threads remain for admin `CompletableFuture` reports only.
 3. **Order state machine** — the enum alone is not the state machine; it's just the alphabet. The actual machine is: (a) an explicit transition table (`Map<OrderStatus, Set<OrderStatus>>`) defining legal `from → to` pairs, (b) a validation step that rejects any transition not in that table, (c) each transition implemented as its own `@Transactional` method that loads the order, validates, performs the business action (reserve inventory / charge payment / etc.), updates the status, and writes an audit log entry — all atomically. States: `CREATED → INVENTORY_RESERVED → PAYMENT_PROCESSING → PAID → FULFILLED → NOTIFIED` (+ `CANCELLED` / `FAILED`). Don't reach for the Spring State Machine library here — it's overkill for a 6-state linear pipeline on this timeline; hand-rolling it is simpler to test and simpler to explain.
 4. **Payment idempotency** — every payment attempt keyed by an idempotency key (order ID is fine). Check for an existing payment record before charging. Never charge twice, even under concurrent retries.
 5. **Caching strategy** — Redis-backed Spring Cache abstraction (`@Cacheable` / `@CacheEvict`) on product catalog reads only (`GET /products`, `GET /products/{id}`), with TTL expiry and explicit eviction on admin product updates. **Redis is never the source of truth for inventory counts.** The pessimistic lock against Postgres remains the sole authority for stock decisions — caching inventory quantities would reintroduce the exact race condition this project exists to solve.
 
 ## Explicitly out of scope — do not add unless asked
 
-- Kafka / RabbitMQ
+- Kafka (RabbitMQ covers notification async; do not add a second broker)
 - Prometheus / Grafana
 - Real-time push (WebSockets) — a polling-friendly status endpoint covers this requirement
 

@@ -31,6 +31,12 @@ spring:
   cache:
     type: redis
 
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:ops}
+    password: ${SPRING_RABBITMQ_PASSWORD:ops}
+
 app:
   jwt:
     secret: ${JWT_SECRET:bW9oYW1lZC1kZXYtand0LXNlY3JldC0zMi1ieXRlcyEh}
@@ -43,6 +49,8 @@ app:
       refill-period-seconds: ${ORDER_RATE_LIMIT_REFILL_PERIOD_SECONDS:60}
   inventory:
     low-stock-threshold: ${LOW_STOCK_THRESHOLD:5}
+  notifications:
+    processing-delay-ms: ${NOTIFICATION_PROCESSING_DELAY_MS:0}
 
 springdoc:
   api-docs:
@@ -60,6 +68,8 @@ management:
       show-details: when_authorized
   health:
     redis:
+      enabled: true
+    rabbit:
       enabled: true
 
 server:
