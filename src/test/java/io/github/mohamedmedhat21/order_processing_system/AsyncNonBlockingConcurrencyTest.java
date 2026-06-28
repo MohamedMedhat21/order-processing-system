@@ -6,7 +6,6 @@ import static org.awaitility.Awaitility.await;
 import java.time.Duration;
 import java.util.List;
 
-import io.github.mohamedmedhat21.order_processing_system.config.SlowNotificationTestConfig;
 import io.github.mohamedmedhat21.order_processing_system.domain.Inventory;
 import io.github.mohamedmedhat21.order_processing_system.dto.order.CreateOrderRequest;
 import io.github.mohamedmedhat21.order_processing_system.dto.order.OrderLineRequest;
@@ -23,11 +22,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
-@Import({TestcontainersConfiguration.class, SlowNotificationTestConfig.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @TestPropertySource(properties = {
 		"app.rate-limit.order-creation.capacity=1000",
-		"app.rate-limit.order-creation.refill-tokens=1000"
+		"app.rate-limit.order-creation.refill-tokens=1000",
+		"app.notifications.processing-delay-ms=1500"
 })
 class AsyncNonBlockingConcurrencyTest {
 
