@@ -1,0 +1,8 @@
+name: "Order Processing System CodeQL config"
+
+# CSRF is intentionally disabled for this stateless JWT Bearer API (no session cookies).
+# See SecurityConfig securityFilterChain and README design section.
+query-filters:
+  - exclude:
+      id: java/spring-disabled-csrf-protection
+      reason: Stateless JWT Bearer authentication — browsers do not auto-send Authorization headers; CSRF applies to cookie-based sessions, not this API.

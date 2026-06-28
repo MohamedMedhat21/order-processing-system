@@ -42,6 +42,9 @@ public class SecurityConfig {
 			HttpSecurity http,
 			OrderCreationRateLimitFilter orderCreationRateLimitFilter
 	) throws Exception {
+		// Stateless JWT Bearer API — no session cookies are used for auth, so CSRF (CWE-352)
+		// does not apply; browsers do not automatically attach Authorization headers.
+		// codeql[java/spring-disabled-csrf-protection]: intentional for token-based stateless API
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
