@@ -184,8 +184,35 @@ PRs are gated by [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 | Build & test | PRs to `integration` / `main` | `./mvnw clean verify` (incl. concurrency suite) |
 | CodeQL (default setup) | PRs and default branch | GitHub-managed code scanning (Settings → Code Security) |
 | Compose smoke | PRs to `main` only | `docker compose up -d --wait` + health check |
+| Publish image | Push to `main` | Build Dockerfile → push to `ghcr.io` |
 
 Never push directly to `integration` or `main`.
+
+---
+
+## Container image (GHCR)
+
+Every push to **`main`** publishes the app image to [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry):
+
+```
+ghcr.io/mohamedmedhat21/order-processing-system:latest
+ghcr.io/mohamedmedhat21/order-processing-system:main
+ghcr.io/mohamedmedhat21/order-processing-system:<git-sha>
+```
+
+Workflow: [`.github/workflows/publish-image.yml`](.github/workflows/publish-image.yml) (also runnable manually via **Actions → Publish Docker image → Run workflow**).
+
+The image contains **only the Spring Boot app**. Postgres and Redis are not included — run them via Compose or your own managed services, then point the app at them with the same env vars as [`.env.example`](.env.example):
+
+```bash
+docker pull ghcr.io/mohamedmedhat21/order-processing-system:latest
+docker compose up -d postgres redis --wait   # from repo root, with .env configured
+docker run --rm -p 8080:8080 --env-file .env \
+  --network order-processing-system_default \
+  ghcr.io/mohamedmedhat21/order-processing-system:latest
+```
+
+For a from-source stack (build locally instead of pulling), use `docker compose up` as in Quick start above.
 
 ---
 
