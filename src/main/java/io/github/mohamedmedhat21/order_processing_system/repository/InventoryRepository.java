@@ -1,5 +1,6 @@
 package io.github.mohamedmedhat21.order_processing_system.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import io.github.mohamedmedhat21.order_processing_system.domain.Inventory;
@@ -16,4 +17,12 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT i FROM Inventory i WHERE i.product.id = :productId")
 	Optional<Inventory> findByProductIdForUpdate(@Param("productId") Long productId);
+
+	@Query("""
+			SELECT i FROM Inventory i
+			JOIN FETCH i.product p
+			WHERE i.quantityAvailable <= :threshold AND p.active = true
+			ORDER BY i.quantityAvailable ASC, p.name ASC
+			""")
+	List<Inventory> findLowStock(@Param("threshold") int threshold);
 }
