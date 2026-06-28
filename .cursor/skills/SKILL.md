@@ -24,7 +24,7 @@ This project's grading hinges on three specific concurrency guarantees. Each has
 class InventoryConcurrencyTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
     @Autowired OrderService orderService;
     @Autowired InventoryRepository inventoryRepository;
