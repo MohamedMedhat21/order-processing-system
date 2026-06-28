@@ -182,7 +182,7 @@ PRs are gated by [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 | Job | When | What |
 |-----|------|------|
 | Build & test | PRs to `integration` / `main` | `./mvnw clean verify` (incl. concurrency suite) |
-| CodeQL | after build | Java security scan |
+| CodeQL (default setup) | PRs and default branch | GitHub-managed code scanning (Settings → Code Security) |
 | Compose smoke | PRs to `main` only | `docker compose up -d --wait` + health check |
 
 Never push directly to `integration` or `main`.
