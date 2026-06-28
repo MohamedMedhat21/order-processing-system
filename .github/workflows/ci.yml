@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [ dev, integration, main ]
+    branches: [ integration, main ]
   push:
-    branches: [ dev ]
+    branches: [ integration ]
 
 # Security rule: default to read-only at the workflow level; jobs escalate
 # permissions only where they explicitly need to (e.g. CodeQL's SARIF upload).
