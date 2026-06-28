@@ -1,8 +1,8 @@
 # Concurrent Order Processing System
 
-Senior Backend Engineer take-home: a Spring Boot e-commerce backend focused on **correct concurrency** — pessimistic inventory locking, idempotent payments, an explicit order state machine, and async notifications on Java 21 virtual threads.
+Senior Backend Engineer take-home: a Spring Boot e-commerce backend focused on **correct concurrency** — pessimistic inventory locking, idempotent payments, an explicit order state machine, and async notifications via RabbitMQ.
 
-**Stack:** Java 21 · Spring Boot 4.0.7 · PostgreSQL 18 · Redis 7 · Flyway · JWT · Bucket4j · Testcontainers · Docker Compose
+**Stack:** Java 21 · Spring Boot 4.0.7 · PostgreSQL 18 · Redis 7 · RabbitMQ 3 · Flyway · JWT · Bucket4j · Testcontainers · Docker Compose
 
 ---
 
@@ -17,13 +17,14 @@ cp .env.example .env
 docker compose up -d --wait
 ```
 
-This starts **app + PostgreSQL + Redis** in one command. Flyway migrations and seed data run on app startup.
+This starts **app + PostgreSQL + Redis + RabbitMQ** in one command. Flyway migrations and seed data run on app startup.
 
 | Service  | URL |
 |----------|-----|
 | API      | http://localhost:8080 |
 | Swagger  | http://localhost:8080/swagger-ui.html |
 | Health   | http://localhost:8080/actuator/health |
+| RabbitMQ management | http://localhost:15672 (user/pass from `.env`) |
 
 ### Seed users
 
@@ -38,14 +39,14 @@ Product **Webcam HD** (id `5`) is seeded with **1 unit** — used by the invento
 
 ## Local development (without Docker for the app)
 
-Run Postgres and Redis via Compose, then start the app with Maven:
+Run Postgres, Redis, and RabbitMQ via Compose, then start the app with Maven:
 
 ```bash
-docker compose up -d postgres redis --wait
+docker compose up -d postgres redis rabbitmq --wait
 ./mvnw spring-boot:run
 ```
 
-Or point `SPRING_DATASOURCE_*` / `SPRING_DATA_REDIS_*` at your own instances (see `application.yaml`).
+Or point `SPRING_DATASOURCE_*`, `SPRING_DATA_REDIS_*`, and `SPRING_RABBITMQ_*` at your own instances (see `application.yaml`).
 
 ---
 
@@ -70,7 +71,8 @@ These are the tests a reviewer should look for first:
 |------|----------------|
 | `InventoryConcurrencyTest` | 50 threads buy the last unit → exactly **one** succeeds |
 | `PaymentIdempotencyConcurrencyTest` | 20 concurrent payment attempts → **one** charge row |
-| `AsyncNonBlockingConcurrencyTest` | HTTP path returns `FULFILLED` before async `NOTIFIED` completes |
+| `AsyncNonBlockingConcurrencyTest` | HTTP path returns `FULFILLED` before RabbitMQ consumer reaches `NOTIFIED` |
+| `OrderNotificationIdempotencyTest` | Duplicate broker deliveries → one notification row |
 
 Run them:
 
@@ -137,9 +139,17 @@ Illegal jumps (e.g. `CREATED → PAID`) are rejected before any side effect runs
 
 Every charge is keyed by `order-{orderId}`. A unique DB constraint plus a read-before-write (and retry on `DataIntegrityViolationException`) guarantees **at most one charge** even under concurrent retries.
 
-### Virtual threads for async work
+### RabbitMQ for async notifications
 
-`Executors.newVirtualThreadPerTaskExecutor()` backs `@Async` notification delivery and admin report generation (`CompletableFuture`). Order creation returns after `FULFILLED`; notification to `NOTIFIED` runs in the background.
+After an order reaches `FULFILLED`, [`NotificationService`](src/main/java/io/github/mohamedmedhat21/order_processing_system/service/NotificationService.java) publishes an `OrderNotificationEvent` to the `order.notifications` exchange. A consumer ([`OrderNotificationListener`](src/main/java/io/github/mohamedmedhat21/order_processing_system/service/OrderNotificationListener.java)) drives the `FULFILLED → NOTIFIED` transition — durable, retryable, and decoupled from the HTTP thread.
+
+**Inventory and payment stay in Postgres** (pessimistic lock + idempotent charge). RabbitMQ is used only at the notification boundary. A transactional outbox would close the rare gap if the broker is down at publish time; that is noted as a future improvement.
+
+Topology: `order.notifications` exchange → `order.notifications.queue` (DLQ: `order.notifications.dlq`).
+
+### Virtual threads for admin reports
+
+`Executors.newVirtualThreadPerTaskExecutor()` backs admin report generation (`CompletableFuture`). Order creation returns after `FULFILLED`; notification to `NOTIFIED` is handled by the RabbitMQ consumer.
 
 ### Redis — catalog only, never inventory
 
@@ -157,7 +167,7 @@ Cut for time; a half-finished integration would read worse than a clean omission
 
 | Feature | Why skipped |
 |---------|-------------|
-| **Kafka / RabbitMQ** | Polling-friendly order status endpoint covers tracking; message broker is bonus scope |
+| **Kafka** | RabbitMQ covers the notification async boundary; full event-sourcing pipeline is out of scope |
 | **Prometheus / Grafana** | Actuator health is enough for compose smoke; metrics stack is bonus scope |
 | **WebSockets** | `GET /api/v1/orders/{id}/status` supports polling clients |
 
@@ -202,11 +212,11 @@ ghcr.io/mohamedmedhat21/order-processing-system:<git-sha>
 
 Workflow: [`.github/workflows/publish-image.yml`](.github/workflows/publish-image.yml) (also runnable manually via **Actions → Publish Docker image → Run workflow**).
 
-The image contains **only the Spring Boot app**. Postgres and Redis are not included — run them via Compose or your own managed services, then point the app at them with the same env vars as [`.env.example`](.env.example):
+The image contains **only the Spring Boot app**. Postgres, Redis, and RabbitMQ are not included — run them via Compose or your own managed services, then point the app at them with the same env vars as [`.env.example`](.env.example):
 
 ```bash
 docker pull ghcr.io/mohamedmedhat21/order-processing-system:latest
-docker compose up -d postgres redis --wait   # from repo root, with .env configured
+docker compose up -d postgres redis rabbitmq --wait   # from repo root, with .env configured
 docker run --rm -p 8080:8080 --env-file .env \
   --network order-processing-system_default \
   ghcr.io/mohamedmedhat21/order-processing-system:latest

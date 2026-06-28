@@ -32,7 +32,7 @@ public class OrderController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	@Operation(summary = "Create order and run processing pipeline (notification sent asynchronously)")
+	@Operation(summary = "Create order and run processing pipeline (notification published to RabbitMQ after FULFILLED)")
 	public OrderResponse createOrder(@Valid @RequestBody CreateOrderRequest request) {
 		return orderService.createOrder(request);
 	}
