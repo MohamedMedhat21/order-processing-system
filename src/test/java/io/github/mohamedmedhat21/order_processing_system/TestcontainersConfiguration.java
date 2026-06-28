@@ -5,6 +5,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.rabbitmq.RabbitMQContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
@@ -20,6 +21,12 @@ class TestcontainersConfiguration {
 	@ServiceConnection(name = "redis")
 	GenericContainer<?> redisContainer() {
 		return new GenericContainer<>(DockerImageName.parse("redis:latest")).withExposedPorts(6379);
+	}
+
+	@Bean
+	@ServiceConnection
+	RabbitMQContainer rabbitMqContainer() {
+		return new RabbitMQContainer(DockerImageName.parse("rabbitmq:3-management-alpine"));
 	}
 
 }

@@ -36,7 +36,7 @@ public class OrderService {
 			orderStateMachine.beginPaymentProcessing(orderId);
 			orderStateMachine.completePayment(orderId);
 			orderStateMachine.fulfill(orderId);
-			notificationService.sendOrderNotificationAsync(orderId);
+			notificationService.publishOrderNotification(orderId);
 		}
 		catch (InsufficientInventoryException ex) {
 			throw ex;
