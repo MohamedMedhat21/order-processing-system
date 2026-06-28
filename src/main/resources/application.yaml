@@ -28,6 +28,21 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
 
+  cache:
+    type: redis
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:bW9oYW1lZC1kZXYtand0LXNlY3JldC0zMi1ieXRlcyEh}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 management:
   endpoints:
     web:
