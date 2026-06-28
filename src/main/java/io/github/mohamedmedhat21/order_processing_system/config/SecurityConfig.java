@@ -24,15 +24,24 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RateLimitProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+	private final RateLimitProperties rateLimitProperties;
 	private final JsonMapper jsonMapper;
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	OrderCreationRateLimitFilter orderCreationRateLimitFilter() {
+		return new OrderCreationRateLimitFilter(rateLimitProperties, jsonMapper);
+	}
+
+	@Bean
+	SecurityFilterChain securityFilterChain(
+			HttpSecurity http,
+			OrderCreationRateLimitFilter orderCreationRateLimitFilter
+	) throws Exception {
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -56,6 +65,7 @@ public class SecurityConfig {
 						.accessDeniedHandler(this::writeForbidden)
 				)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterAfter(orderCreationRateLimitFilter, JwtAuthenticationFilter.class)
 				.build();
 	}
 
